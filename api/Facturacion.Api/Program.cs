@@ -1,5 +1,6 @@
 using Facturacion.Api.Data;
 using Facturacion.Api.Dtos;
+using Facturacion.Api.Gateway;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,6 +13,8 @@ builder.Services.AddDbContext<FacturacionDbContext>(
     options => options.UseSqlite(connectionString),
     ServiceLifetime.Singleton,
     ServiceLifetime.Singleton);
+
+builder.Services.AddSingleton<IPaymentGateway, FakePaymentGateway>();
 
 builder.Services.AddCors(options =>
 {
@@ -73,5 +76,7 @@ app.MapGet("/api/charges/{id:guid}", async (Guid id, FacturacionDbContext db) =>
 
     return Results.Ok(ChargeMapper.ToDetail(charge));
 });
+
+app.MapGet("/api/_dev/gateway-log", (IPaymentGateway gateway) => Results.Ok(gateway.GetLog()));
 
 app.Run();
