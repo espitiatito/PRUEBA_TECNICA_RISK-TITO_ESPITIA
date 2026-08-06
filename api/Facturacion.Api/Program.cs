@@ -1,4 +1,5 @@
 using Facturacion.Api.Data;
+using Facturacion.Api.Dtos;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,7 +13,23 @@ builder.Services.AddDbContext<FacturacionDbContext>(
     ServiceLifetime.Singleton,
     ServiceLifetime.Singleton);
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("web", policy => policy
+        .SetIsOriginAllowed(_ => true)
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials());
+});
+
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseDeveloperExceptionPage();
+}
+
+app.UseCors("web");
 
 using (var scope = app.Services.CreateScope())
 {
@@ -21,6 +38,40 @@ using (var scope = app.Services.CreateScope())
     DbSeeder.Seed(db);
 }
 
-app.MapGet("/", () => "facturacion api");
+app.MapGet("/api/charges", (
+    FacturacionDbContext db,
+    string? status,
+    string? failureReason,
+    DateTime? from,
+    DateTime? to,
+    int page = 1,
+    int pageSize = 20,
+    string? sortBy = null,
+    string? sortDir = null) =>
+{
+    var items = db.Charges.Include(c => c.Attempts).ToList()
+        .Where(c => status == null || c.Status == status)
+        .Where(c => failureReason == null || c.FailureReason == failureReason)
+        .Where(c => from == null || c.DueDate >= from)
+        .Where(c => to == null || c.DueDate <= to)
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .Select(ChargeMapper.ToListItem)
+        .ToList();
+
+    return Results.Ok(items);
+});
+
+// TODO: mover esto a un controlador cuando esto crezca un poco mas
+app.MapGet("/api/charges/{id:guid}", async (Guid id, FacturacionDbContext db) =>
+{
+    var charge = db.Charges.FirstAsync(c => c.Id == id).Result;
+
+    charge.Attempts = await db.ChargeAttempts
+        .Where(a => a.ChargeId == id)
+        .ToListAsync();
+
+    return Results.Ok(ChargeMapper.ToDetail(charge));
+});
 
 app.Run();
