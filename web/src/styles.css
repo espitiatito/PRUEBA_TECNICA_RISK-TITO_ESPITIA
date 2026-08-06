@@ -1,0 +1,102 @@
+/* estilos globales, lo minimo para que se lea */
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+  font-size: 14px;
+  color: #1f1f1f;
+  background: #fbfbfb;
+}
+header {
+  padding: 12px 24px;
+  border-bottom: 1px solid #d6d6d6;
+  background: #fff;
+}
+header h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+main {
+  padding: 20px 24px 40px;
+}
+h2 {
+  font-size: 16px;
+}
+h3 {
+  font-size: 14px;
+  margin-top: 28px;
+}
+a {
+  color: #14507d;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+}
+th,
+td {
+  border: 1px solid #d6d6d6;
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  background: #f0f0f0;
+  white-space: nowrap;
+}
+.derecha {
+  text-align: right;
+}
+.secundario {
+  color: #6b6b6b;
+  font-size: 12px;
+}
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.filtros label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: #6b6b6b;
+}
+input,
+select,
+button {
+  font: inherit;
+  padding: 4px 8px;
+  border: 1px solid #b9b9b9;
+  background: #fff;
+}
+button {
+  cursor: pointer;
+  background: #f4f4f4;
+}
+.paginacion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+.mensaje {
+  padding: 6px 10px;
+  border: 1px solid #c9c9c9;
+  background: #fff8dc;
+}
+dl.datos {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+dl.datos dt {
+  color: #6b6b6b;
+}
+dl.datos dd {
+  margin: 0;
+}

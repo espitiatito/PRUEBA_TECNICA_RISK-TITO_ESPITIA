@@ -1,0 +1,78 @@
+<h2>Cobros fallidos</h2>
+
+<div class="filtros">
+  <label>
+    Estado
+    <select [(ngModel)]="estado" (change)="filtrar()">
+      <option value="">(todos)</option>
+      @for (e of estados; track e) {
+        <option [value]="e">{{ etiquetasEstado[e] || e }}</option>
+      }
+    </select>
+  </label>
+
+  <label>
+    Motivo
+    <select [(ngModel)]="motivo" (change)="filtrar()">
+      <option value="">(todos)</option>
+      @for (m of motivos; track m) {
+        <option [value]="m">{{ etiquetasMotivo[m] || m }}</option>
+      }
+    </select>
+  </label>
+
+  <label>
+    Desde
+    <input type="date" [(ngModel)]="desde" (change)="filtrar()" />
+  </label>
+
+  <label>
+    Hasta
+    <input type="date" [(ngModel)]="hasta" (change)="filtrar()" />
+  </label>
+
+  <label>
+    Buscar
+    <input type="text" placeholder="cliente o referencia" [(ngModel)]="texto" (keyup)="filtrar()" />
+  </label>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Cliente</th>
+      <th>Referencia</th>
+      <th>Monto</th>
+      <th>Vencimiento</th>
+      <th>Estado</th>
+      <th>Motivo</th>
+      <th>Intentos</th>
+    </tr>
+  </thead>
+  <tbody>
+    @for (cobro of filas; track cobro.id) {
+      <tr>
+        <td>
+          <a [routerLink]="['/charges', cobro.id]">{{ cobro.customerName }}</a>
+          <div class="secundario">{{ cobro.customerEmail }}</div>
+        </td>
+        <td>{{ cobro.externalReference }}</td>
+        <td class="derecha">{{ cobro.amount | number: '1.0-2' }} {{ cobro.currency }}</td>
+        <td>{{ cobro.dueDate | date: 'yyyy-MM-dd HH:mm' }}</td>
+        <td>{{ etiquetasEstado[cobro.status] || cobro.status }}</td>
+        <td>{{ cobro.failureReason ? etiquetasMotivo[cobro.failureReason] || cobro.failureReason : '-' }}</td>
+        <td class="derecha">{{ cobro.attemptCount }}</td>
+      </tr>
+    } @empty {
+      <tr>
+        <td colspan="7">No hay cobros fallidos con esos filtros.</td>
+      </tr>
+    }
+  </tbody>
+</table>
+
+<div class="paginacion">
+  <button type="button" (click)="irA(pagina - 1)">Anterior</button>
+  <span>Página {{ pagina }} de {{ totalPaginas }}</span>
+  <button type="button" (click)="irA(pagina + 1)">Siguiente</button>
+</div>
