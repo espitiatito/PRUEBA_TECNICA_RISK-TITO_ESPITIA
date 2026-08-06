@@ -37,6 +37,10 @@
   </label>
 </div>
 
+@if (mensaje()) {
+  <p class="mensaje">{{ mensaje() }}</p>
+}
+
 <table>
   <thead>
     <tr>
@@ -47,6 +51,7 @@
       <th>Estado</th>
       <th>Motivo</th>
       <th>Intentos</th>
+      <th></th>
     </tr>
   </thead>
   <tbody>
@@ -62,10 +67,11 @@
         <td>{{ etiquetasEstado[cobro.status] || cobro.status }}</td>
         <td>{{ cobro.failureReason ? etiquetasMotivo[cobro.failureReason] || cobro.failureReason : '-' }}</td>
         <td class="derecha">{{ cobro.attemptCount }}</td>
+        <td><button type="button" (click)="reintentar(cobro)">Reintentar</button></td>
       </tr>
     } @empty {
       <tr>
-        <td colspan="7">No hay cobros fallidos con esos filtros.</td>
+        <td colspan="8">No hay cobros fallidos con esos filtros.</td>
       </tr>
     }
   </tbody>

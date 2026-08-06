@@ -24,6 +24,14 @@
     <dd>{{ cobro.attemptCount }}</dd>
   </dl>
 
+  <p>
+    <button type="button" (click)="reintentar()">Reintentar cobro</button>
+  </p>
+
+  @if (mensaje()) {
+    <p class="mensaje">{{ mensaje() }}</p>
+  }
+
   <h3>Historial de intentos</h3>
   <table>
     <thead>

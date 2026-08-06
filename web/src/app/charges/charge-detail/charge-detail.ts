@@ -22,6 +22,7 @@ export class ChargeDetail implements OnInit {
   id = '';
   cobro = signal<ChargeDetailDto | null>(null);
   intentos = signal<ChargeAttempt[]>([]);
+  mensaje = signal('');
 
   readonly etiquetasEstado = ETIQUETAS_ESTADO;
   readonly etiquetasMotivo = ETIQUETAS_MOTIVO;
@@ -39,6 +40,19 @@ export class ChargeDetail implements OnInit {
       this.charges.get(this.id).subscribe((detalle) => {
         this.intentos.set(detalle.attempts);
       });
+    });
+  }
+
+  reintentar(): void {
+    const cobro = this.cobro();
+    if (!cobro) {
+      return;
+    }
+
+    this.mensaje.set('');
+    this.charges.retry(cobro.id, cobro.amount).subscribe((respuesta) => {
+      this.mensaje.set(respuesta.message);
+      this.cargar();
     });
   }
 }

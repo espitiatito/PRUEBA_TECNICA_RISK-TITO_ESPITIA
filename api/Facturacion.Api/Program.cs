@@ -1,6 +1,7 @@
 using Facturacion.Api.Data;
 using Facturacion.Api.Dtos;
 using Facturacion.Api.Gateway;
+using Facturacion.Api.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,6 +16,7 @@ builder.Services.AddDbContext<FacturacionDbContext>(
     ServiceLifetime.Singleton);
 
 builder.Services.AddSingleton<IPaymentGateway, FakePaymentGateway>();
+builder.Services.AddScoped<ChargeRetryService>();
 
 builder.Services.AddCors(options =>
 {
@@ -75,6 +77,16 @@ app.MapGet("/api/charges/{id:guid}", async (Guid id, FacturacionDbContext db) =>
         .ToListAsync();
 
     return Results.Ok(ChargeMapper.ToDetail(charge));
+});
+
+app.MapPost("/api/charges/{id:guid}/retry", async (
+    Guid id,
+    RetryChargeRequest request,
+    ChargeRetryService service,
+    CancellationToken cancellationToken) =>
+{
+    var response = await service.RetryAsync(id, request, cancellationToken);
+    return Results.Ok(response);
 });
 
 app.MapGet("/api/_dev/gateway-log", (IPaymentGateway gateway) => Results.Ok(gateway.GetLog()));

@@ -16,6 +16,7 @@ export class ChargesList implements OnInit {
   private readonly http = inject(HttpClient);
 
   cobros = signal<any[]>([]);
+  mensaje = signal('');
 
   estado = 'failed';
   motivo = '';
@@ -75,6 +76,22 @@ export class ChargesList implements OnInit {
       return;
     }
     this.pagina = pagina;
+  }
+
+  reintentar(cobro: any): void {
+    this.mensaje.set('');
+    this.cobros.update((lista: any[]) =>
+      lista.map((c: any) => (c.id === cobro.id ? { ...c, status: 'paid' } : c)),
+    );
+
+    this.http
+      .post<any>('http://localhost:5080/api/charges/' + cobro.id + '/retry', { amount: cobro.amount })
+      .subscribe((respuesta: any) => {
+        this.mensaje.set(respuesta.message);
+        if (respuesta.success) {
+          this.ngOnInit();
+        }
+      });
   }
 
   private filtrados(): any[] {
