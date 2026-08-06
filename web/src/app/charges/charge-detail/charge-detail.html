@@ -1,0 +1,56 @@
+<p><a routerLink="/charges">&larr; Volver a la bandeja</a></p>
+
+@if (cobro(); as cobro) {
+  <h2>{{ cobro.customerName }}</h2>
+
+  <dl class="datos">
+    <dt>Referencia</dt>
+    <dd>{{ cobro.externalReference }}</dd>
+    <dt>Cliente</dt>
+    <dd>{{ cobro.customerId }} &middot; {{ cobro.customerEmail }}</dd>
+    <dt>Suscripción</dt>
+    <dd>{{ cobro.subscriptionId }}</dd>
+    <dt>Monto</dt>
+    <dd>{{ cobro.amount | number: '1.0-2' }} {{ cobro.currency }}</dd>
+    <dt>Vencimiento</dt>
+    <dd>{{ cobro.dueDate | date: 'yyyy-MM-dd HH:mm' }}</dd>
+    <dt>Creado</dt>
+    <dd>{{ cobro.createdAt | date: 'yyyy-MM-dd HH:mm' }}</dd>
+    <dt>Estado</dt>
+    <dd>{{ etiquetasEstado[cobro.status] || cobro.status }}</dd>
+    <dt>Motivo del fallo</dt>
+    <dd>{{ cobro.failureReason ? etiquetasMotivo[cobro.failureReason] || cobro.failureReason : '-' }}</dd>
+    <dt>Intentos</dt>
+    <dd>{{ cobro.attemptCount }}</dd>
+  </dl>
+
+  <h3>Historial de intentos</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Origen</th>
+        <th>Resultado</th>
+        <th>Mensaje</th>
+        <th>Referencia pasarela</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (intento of intentos(); track intento.id) {
+        <tr>
+          <td>{{ intento.attemptedAt | date: 'yyyy-MM-dd HH:mm:ss' }}</td>
+          <td>{{ intento.triggeredBy }}</td>
+          <td>{{ intento.succeeded ? 'Aprobado' : 'Rechazado' }}</td>
+          <td>{{ intento.gatewayMessage }}</td>
+          <td>{{ intento.gatewayReference || '-' }}</td>
+        </tr>
+      } @empty {
+        <tr>
+          <td colspan="5">Sin intentos registrados.</td>
+        </tr>
+      }
+    </tbody>
+  </table>
+} @else {
+  <p>Cargando el cobro…</p>
+}
