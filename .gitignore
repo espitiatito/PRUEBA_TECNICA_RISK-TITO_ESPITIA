@@ -1,0 +1,18 @@
+# .NET
+bin/
+obj/
+*.user
+.vs/
+
+# base local
+*.db
+*.db-shm
+*.db-wal
+
+# node / angular
+node_modules/
+dist/
+.angular/
+
+# notas del evaluador
+_evaluador/
