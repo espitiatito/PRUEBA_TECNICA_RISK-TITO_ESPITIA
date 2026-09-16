@@ -45,4 +45,5 @@ public static class BusinessErrorCodes
     public const string RetryInProgress = "RETRY_IN_PROGRESS";
     public const string AmountMismatch = "AMOUNT_MISMATCH";
     public const string ChargeNotFound = "CHARGE_NOT_FOUND";
+    public const string InvalidAmount = "INVALID_AMOUNT";
 }

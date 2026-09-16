@@ -1,6 +1,7 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { Subscription } from 'rxjs';
 
 import {
   ChargeAttempt,
@@ -17,9 +18,10 @@ import { ChargesService } from '../../services/charges.service';
   imports: [RouterLink, DatePipe, DecimalPipe],
   templateUrl: './charge-detail.html',
 })
-export class ChargeDetail implements OnInit {
+export class ChargeDetail implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly chargesService = inject(ChargesService);
+  private detailSub?: Subscription;
 
   id = '';
   readonly cobro = signal<ChargeDetailDto | null>(null);
@@ -40,12 +42,17 @@ export class ChargeDetail implements OnInit {
     this.cargar();
   }
 
+  ngOnDestroy(): void {
+    this.detailSub?.unsubscribe();
+  }
+
   cargar(): void {
+    this.detailSub?.unsubscribe();
     this.cargando.set(true);
     this.errorCarga.set('');
 
     // Corrección del bug base: Una única llamada HTTP que ya trae el historial ordenado
-    this.chargesService.get(this.id).subscribe({
+    this.detailSub = this.chargesService.get(this.id).subscribe({
       next: (detalle) => {
         this.cobro.set(detalle);
         this.intentos.set(detalle.attempts ?? []);

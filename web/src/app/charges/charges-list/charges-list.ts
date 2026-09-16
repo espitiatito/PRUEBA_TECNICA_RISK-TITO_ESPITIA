@@ -27,6 +27,7 @@ export class ChargesList implements OnInit, OnDestroy {
   private readonly chargesService = inject(ChargesService);
   private readonly searchSubject = new Subject<string>();
   private searchSub?: Subscription;
+  private listSub?: Subscription;
 
   // Estados de vista explícitos (RF-1 / Frontend guidelines)
   readonly estadoVista = signal<ViewState>('cargando');
@@ -74,6 +75,7 @@ export class ChargesList implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.searchSub?.unsubscribe();
+    this.listSub?.unsubscribe();
   }
 
   onSearchChange(): void {
@@ -105,6 +107,9 @@ export class ChargesList implements OnInit, OnDestroy {
   }
 
   cargarCobros(): void {
+    // Cancelamos cualquier petición previa en vuelo para evitar que una respuesta lenta sobreescriba una nueva
+    this.listSub?.unsubscribe();
+
     this.estadoVista.set('cargando');
     this.limpiarMensajes();
 
@@ -126,7 +131,7 @@ export class ChargesList implements OnInit, OnDestroy {
       filters.to = `${this.hasta}T23:59:59Z`;
     }
 
-    this.chargesService.list(filters).subscribe({
+    this.listSub = this.chargesService.list(filters).subscribe({
       next: (resultado) => {
         this.cobros.set(resultado.items);
         this.totalRegistros.set(resultado.totalCount);

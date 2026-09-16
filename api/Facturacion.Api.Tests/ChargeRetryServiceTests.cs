@@ -195,5 +195,17 @@ public class ChargeRetryServiceTests : IDisposable
         Assert.Single(updated.Attempts);
         Assert.False(updated.Attempts[0].Succeeded);
     }
+
+    [Fact]
+    public async Task Reintento_MontoMenorOIgualACero_RechazaComoMontoInvalido()
+    {
+        var charge = CreateCharge(amount: 50000m);
+
+        var result = await _service.RetryAsync(charge.Id, new RetryChargeRequest { Amount = 0m });
+
+        Assert.False(result.Success);
+        Assert.Equal(BusinessErrorCodes.InvalidAmount, result.ErrorCode);
+        Assert.Equal(0, _gateway.CallCount);
+    }
 }
 
