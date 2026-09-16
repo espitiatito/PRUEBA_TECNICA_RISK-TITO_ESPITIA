@@ -241,7 +241,7 @@ public static class DbSeeder
             Currency = "COP",
             DueDate = today.AddDays(-22).AddHours(8),
             CreatedAt = DateTime.Now,
-            Status = "Paid",
+            Status = ChargeStatuses.Paid,
             AttemptCount = 1
         };
         primero.Attempts.Add(NewAttempt(primero, reintentoManual, TriggeredBy.Operaciones, true, null, rnd));
@@ -259,7 +259,7 @@ public static class DbSeeder
             Currency = "COP",
             DueDate = today.AddDays(-22).AddHours(8),
             CreatedAt = DateTime.Now,
-            Status = "Paid",
+            Status = ChargeStatuses.Paid,
             AttemptCount = 1
         };
         segundo.Attempts.Add(NewAttempt(segundo, reintentoManual.AddMinutes(7), TriggeredBy.Operaciones, true, null, rnd));
