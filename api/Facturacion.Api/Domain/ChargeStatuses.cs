@@ -6,8 +6,9 @@ public static class ChargeStatuses
     public const string Failed = "failed";
     public const string Paid = "paid";
     public const string Canceled = "canceled";
+    public const string Processing = "processing";
 
-    public static readonly string[] All = { Pending, Failed, Paid, Canceled };
+    public static readonly string[] All = { Pending, Failed, Paid, Canceled, Processing };
 }
 
 public static class FailureReasons
@@ -33,4 +34,15 @@ public static class TriggeredBy
 public static class ChargePolicy
 {
     public const int MaxRetryAttempts = 3;
+}
+
+public static class BusinessErrorCodes
+{
+    public const string AlreadyPaid = "ALREADY_PAID";
+    public const string AlreadyCanceled = "ALREADY_CANCELED";
+    public const string MaxAttemptsExceeded = "MAX_ATTEMPTS_EXCEEDED";
+    public const string CardExpired = "CARD_EXPIRED";
+    public const string RetryInProgress = "RETRY_IN_PROGRESS";
+    public const string AmountMismatch = "AMOUNT_MISMATCH";
+    public const string ChargeNotFound = "CHARGE_NOT_FOUND";
 }
