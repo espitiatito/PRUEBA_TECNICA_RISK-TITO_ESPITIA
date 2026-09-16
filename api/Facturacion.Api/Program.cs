@@ -3,6 +3,7 @@ using Facturacion.Api.Domain;
 using Facturacion.Api.Dtos;
 using Facturacion.Api.Gateway;
 using Facturacion.Api.Services;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -140,6 +141,48 @@ app.MapPost("/api/charges/{id:guid}/retry", async (
     CancellationToken cancellationToken) =>
 {
     var response = await service.RetryAsync(id, request, cancellationToken);
+    if (!response.Success)
+    {
+        if (response.ErrorCode == BusinessErrorCodes.ChargeNotFound)
+        {
+            return Results.NotFound(new ProblemDetails
+            {
+                Status = StatusCodes.Status404NotFound,
+                Title = "Cobro no encontrado",
+                Detail = response.Message
+            });
+        }
+
+        if (response.ErrorCode == BusinessErrorCodes.RetryInProgress)
+        {
+            return Results.Conflict(new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "Reintento en curso",
+                Detail = response.Message,
+                Extensions = { ["errorCode"] = response.ErrorCode }
+            });
+        }
+
+        if (response.ErrorCode != null)
+        {
+            return Results.UnprocessableEntity(new ProblemDetails
+            {
+                Status = StatusCodes.Status422UnprocessableEntity,
+                Title = "Regla de negocio no satisfecha",
+                Detail = response.Message,
+                Extensions = { ["errorCode"] = response.ErrorCode }
+            });
+        }
+
+        return Results.BadRequest(new ProblemDetails
+        {
+            Status = StatusCodes.Status400BadRequest,
+            Title = "Error en el cobro",
+            Detail = response.Message
+        });
+    }
+
     return Results.Ok(response);
 });
 

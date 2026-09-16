@@ -42,9 +42,9 @@ public class RetryChargeRequest
     public string? TriggeredBy { get; set; }
 }
 
-public record ApiResponse(bool Success, string Message, object? Data = null)
+public record ApiResponse(bool Success, string Message, object? Data = null, string? ErrorCode = null)
 {
-    public static ApiResponse Fail(string message) => new ApiResponse(false, message);
+    public static ApiResponse Fail(string message, string? errorCode = null) => new ApiResponse(false, message, null, errorCode);
 
     public static ApiResponse Ok(string message, object? data = null) => new ApiResponse(true, message, data);
 }
@@ -57,4 +57,3 @@ public record PagedResult<T>(
 {
     public int TotalPages => PageSize > 0 ? (int)Math.Ceiling((double)TotalCount / PageSize) : 0;
 }
-
