@@ -3,14 +3,14 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { environment } from '../../environments/environment';
-import { Charge, ChargeDetail, ChargeFilters, RetryResult } from '../models/charge';
+import { Charge, ChargeDetail, ChargeFilters, PagedResult, RetryResult } from '../models/charge';
 
 @Injectable({ providedIn: 'root' })
 export class ChargesService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = `${environment.apiBaseUrl}/api/charges`;
 
-  list(filters: ChargeFilters = {}): Observable<Charge[]> {
+  list(filters: ChargeFilters = {}): Observable<PagedResult<Charge>> {
     let params = new HttpParams();
 
     if (filters.status) {
@@ -25,14 +25,23 @@ export class ChargesService {
     if (filters.to) {
       params = params.set('to', filters.to);
     }
+    if (filters.search) {
+      params = params.set('search', filters.search);
+    }
     if (filters.page) {
-      params = params.set('page', filters.page);
+      params = params.set('page', filters.page.toString());
     }
     if (filters.pageSize) {
-      params = params.set('pageSize', filters.pageSize);
+      params = params.set('pageSize', filters.pageSize.toString());
+    }
+    if (filters.sortBy) {
+      params = params.set('sortBy', filters.sortBy);
+    }
+    if (filters.sortDir) {
+      params = params.set('sortDir', filters.sortDir);
     }
 
-    return this.http.get<Charge[]>(this.baseUrl, { params });
+    return this.http.get<PagedResult<Charge>>(this.baseUrl, { params });
   }
 
   get(id: string): Observable<ChargeDetail> {
@@ -42,7 +51,7 @@ export class ChargesService {
   retry(id: string, amount: number): Observable<RetryResult> {
     return this.http.post<RetryResult>(`${this.baseUrl}/${id}/retry`, {
       amount,
-      triggeredBy: 'operaciones',
+      triggeredBy: 'ops@empresa.com',
     });
   }
 }

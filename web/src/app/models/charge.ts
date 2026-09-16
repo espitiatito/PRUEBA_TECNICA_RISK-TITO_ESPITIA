@@ -32,17 +32,39 @@ export interface ChargeFilters {
   failureReason?: string;
   from?: string;
   to?: string;
+  search?: string;
   page?: number;
   pageSize?: number;
+  sortBy?: string;
+  sortDir?: 'asc' | 'desc';
+}
+
+export interface PagedResult<T> {
+  items: T[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
 export interface RetryResult {
   success: boolean;
   message: string;
+  errorCode?: string | null;
   data?: Charge | null;
 }
 
-export const ESTADOS = ['pending', 'failed', 'paid', 'canceled'];
+export interface ProblemDetails {
+  type?: string;
+  title?: string;
+  status?: number;
+  detail?: string;
+  instance?: string;
+  errorCode?: string;
+  [key: string]: unknown;
+}
+
+export const ESTADOS = ['pending', 'failed', 'paid', 'canceled', 'processing'];
 
 export const MOTIVOS = [
   'tarjeta_rechazada',
@@ -57,6 +79,7 @@ export const ETIQUETAS_ESTADO: Record<string, string> = {
   failed: 'Fallido',
   paid: 'Pagado',
   canceled: 'Anulado',
+  processing: 'En proceso',
 };
 
 export const ETIQUETAS_MOTIVO: Record<string, string> = {
