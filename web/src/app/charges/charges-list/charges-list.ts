@@ -50,9 +50,10 @@ export class ChargesList implements OnInit {
 
     this.http
       .get<any>(url)
-      .pipe(catchError(() => of([])))
+      .pipe(catchError(() => of({ items: [] })))
       .subscribe((data: any) => {
-        this.cobros.set(data);
+        const items = Array.isArray(data) ? data : (data?.items ?? []);
+        this.cobros.set(items);
       });
   }
 
@@ -96,6 +97,9 @@ export class ChargesList implements OnInit {
 
   private filtrados(): any[] {
     const lista = this.cobros();
+    if (!Array.isArray(lista)) {
+      return [];
+    }
     if (!this.texto) {
       return lista;
     }
@@ -103,8 +107,8 @@ export class ChargesList implements OnInit {
     const buscado = this.texto.toLowerCase();
     return lista.filter(
       (c: any) =>
-        c.customerName.toLowerCase().includes(buscado) ||
-        c.externalReference.toLowerCase().includes(buscado),
+        c.customerName?.toLowerCase().includes(buscado) ||
+        c.externalReference?.toLowerCase().includes(buscado),
     );
   }
 }

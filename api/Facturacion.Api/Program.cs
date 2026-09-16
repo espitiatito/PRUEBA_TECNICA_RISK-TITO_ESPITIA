@@ -1,4 +1,5 @@
 using Facturacion.Api.Data;
+using Facturacion.Api.Domain;
 using Facturacion.Api.Dtos;
 using Facturacion.Api.Gateway;
 using Facturacion.Api.Services;
@@ -9,11 +10,9 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("Default")
     ?? "Data Source=facturacion.db";
 
-// una sola instancia, asi no lo recreamos en cada request
-builder.Services.AddDbContext<FacturacionDbContext>(
-    options => options.UseSqlite(connectionString),
-    ServiceLifetime.Singleton,
-    ServiceLifetime.Singleton);
+// FacturacionDbContext registrado con ciclo de vida Scoped (por solicitud de concurrencia y seguridad de hilos)
+builder.Services.AddDbContext<FacturacionDbContext>(options =>
+    options.UseSqlite(connectionString));
 
 builder.Services.AddSingleton<IPaymentGateway, FakePaymentGateway>();
 builder.Services.AddScoped<ChargeRetryService>();
@@ -43,38 +42,93 @@ using (var scope = app.Services.CreateScope())
     DbSeeder.Seed(db);
 }
 
-app.MapGet("/api/charges", (
+// RF-1: Bandeja de cobros paginada en servidor con filtros y ordenamiento
+app.MapGet("/api/charges", async (
     FacturacionDbContext db,
     string? status,
     string? failureReason,
     DateTime? from,
     DateTime? to,
+    string? search,
     int page = 1,
     int pageSize = 20,
     string? sortBy = null,
-    string? sortDir = null) =>
+    string? sortDir = null,
+    CancellationToken cancellationToken = default) =>
 {
-    var items = db.Charges.Include(c => c.Attempts).ToList()
-        .Where(c => status == null || c.Status == status)
-        .Where(c => failureReason == null || c.FailureReason == failureReason)
-        .Where(c => from == null || c.DueDate >= from)
-        .Where(c => to == null || c.DueDate <= to)
+    if (page < 1) page = 1;
+    if (pageSize < 1) pageSize = 20;
+    if (pageSize > 100) pageSize = 100;
+
+    IQueryable<Charge> query = db.Charges.AsNoTracking();
+
+    if (!string.IsNullOrWhiteSpace(status))
+    {
+        var s = status.Trim().ToLowerInvariant();
+        query = query.Where(c => c.Status.ToLower() == s);
+    }
+
+    if (!string.IsNullOrWhiteSpace(failureReason))
+    {
+        var r = failureReason.Trim();
+        query = query.Where(c => c.FailureReason == r);
+    }
+
+    if (from.HasValue)
+    {
+        var fromUtc = DateTime.SpecifyKind(from.Value, DateTimeKind.Utc);
+        query = query.Where(c => c.DueDate >= fromUtc);
+    }
+
+    if (to.HasValue)
+    {
+        var toUtc = DateTime.SpecifyKind(to.Value, DateTimeKind.Utc);
+        query = query.Where(c => c.DueDate <= toUtc);
+    }
+
+    if (!string.IsNullOrWhiteSpace(search))
+    {
+        var term = search.Trim().ToLower();
+        query = query.Where(c => c.CustomerName.ToLower().Contains(term)
+                              || c.ExternalReference.ToLower().Contains(term)
+                              || c.CustomerEmail.ToLower().Contains(term));
+    }
+
+    // Ordenamiento por monto o fecha
+    var isDesc = string.Equals(sortDir, "desc", StringComparison.OrdinalIgnoreCase);
+    query = sortBy?.ToLowerInvariant() switch
+    {
+        "monto" or "amount" => isDesc ? query.OrderByDescending(c => c.Amount) : query.OrderBy(c => c.Amount),
+        "fecha" or "date" or "duedate" => isDesc ? query.OrderByDescending(c => c.DueDate) : query.OrderBy(c => c.DueDate),
+        _ => isDesc ? query.OrderBy(c => c.DueDate) : query.OrderByDescending(c => c.DueDate)
+    };
+
+    var totalCount = await query.CountAsync(cancellationToken);
+
+    var items = await query
         .Skip((page - 1) * pageSize)
         .Take(pageSize)
-        .Select(ChargeMapper.ToListItem)
-        .ToList();
+        .Select(c => ChargeMapper.ToListItem(c))
+        .ToListAsync(cancellationToken);
 
-    return Results.Ok(items);
+    return Results.Ok(new PagedResult<ChargeListItemDto>(items, totalCount, page, pageSize));
 });
 
-// TODO: mover esto a un controlador cuando esto crezca un poco mas
-app.MapGet("/api/charges/{id:guid}", async (Guid id, FacturacionDbContext db) =>
+// RF-2: Detalle del cobro con historial de intentos
+app.MapGet("/api/charges/{id:guid}", async (
+    Guid id,
+    FacturacionDbContext db,
+    CancellationToken cancellationToken) =>
 {
-    var charge = db.Charges.FirstAsync(c => c.Id == id).Result;
+    var charge = await db.Charges
+        .AsNoTracking()
+        .Include(c => c.Attempts)
+        .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
 
-    charge.Attempts = await db.ChargeAttempts
-        .Where(a => a.ChargeId == id)
-        .ToListAsync();
+    if (charge is null)
+    {
+        return Results.NotFound(new { message = $"No se encontró el cobro con id {id}" });
+    }
 
     return Results.Ok(ChargeMapper.ToDetail(charge));
 });
