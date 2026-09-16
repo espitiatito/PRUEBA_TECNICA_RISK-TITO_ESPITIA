@@ -1,5 +1,7 @@
-<h2>Cobros fallidos</h2>
+﻿<h2>Bandeja de cobros fallidos</h2>
+<p class="secundario">Total encontrados: <strong>{{ totalRegistros() }}</strong> cobros</p>
 
+<!-- Filtros de búsqueda (RF-1) -->
 <div class="filtros">
   <label>
     Estado
@@ -33,52 +35,94 @@
 
   <label>
     Buscar
-    <input type="text" placeholder="cliente o referencia" [(ngModel)]="texto" (keyup)="filtrar()" />
+    <input
+      type="text"
+      placeholder="cliente, correo o referencia"
+      [(ngModel)]="texto"
+      (input)="onSearchChange()"
+    />
   </label>
 </div>
 
-@if (mensaje()) {
-  <p class="mensaje">{{ mensaje() }}</p>
+<!-- Diferenciación visual de alertas (RF-4) -->
+@if (mensajeExito()) {
+  <p class="alerta alerta-exito">{{ mensajeExito() }}</p>
+}
+@if (mensajeReglaNegocio()) {
+  <p class="alerta alerta-regla">{{ mensajeReglaNegocio() }}</p>
+}
+@if (mensajeErrorSistema()) {
+  <p class="alerta alerta-error">{{ mensajeErrorSistema() }}</p>
 }
 
-<table>
-  <thead>
-    <tr>
-      <th>Cliente</th>
-      <th>Referencia</th>
-      <th>Monto</th>
-      <th>Vencimiento</th>
-      <th>Estado</th>
-      <th>Motivo</th>
-      <th>Intentos</th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-    @for (cobro of filas; track cobro.id) {
+<!-- Gestión de los 4 estados explícitos de la vista -->
+@if (estadoVista() === 'cargando') {
+  <p class="estado-cargando">Cargando cobros...</p>
+} @else if (estadoVista() === 'error') {
+  <div class="estado-error">
+    <p>{{ mensajeErrorSistema() || 'No se pudieron cargar los datos de la bandeja.' }}</p>
+    <button type="button" (click)="cargarCobros()">Reintentar carga</button>
+  </div>
+} @else if (estadoVista() === 'vacio') {
+  <p class="estado-vacio">No hay cobros con esos filtros.</p>
+} @else {
+  <!-- Tabla con datos paginados en servidor (RF-1) -->
+  <table>
+    <thead>
       <tr>
-        <td>
-          <a [routerLink]="['/charges', cobro.id]">{{ cobro.customerName }}</a>
-          <div class="secundario">{{ cobro.customerEmail }}</div>
-        </td>
-        <td>{{ cobro.externalReference }}</td>
-        <td class="derecha">{{ cobro.amount | number: '1.0-2' }} {{ cobro.currency }}</td>
-        <td>{{ cobro.dueDate | date: 'yyyy-MM-dd HH:mm' }}</td>
-        <td>{{ etiquetasEstado[cobro.status] || cobro.status }}</td>
-        <td>{{ cobro.failureReason ? etiquetasMotivo[cobro.failureReason] || cobro.failureReason : '-' }}</td>
-        <td class="derecha">{{ cobro.attemptCount }}</td>
-        <td><button type="button" (click)="reintentar(cobro)">Reintentar</button></td>
+        <th>Cliente</th>
+        <th>Referencia</th>
+        <th class="col-ordenable derecha" (click)="cambiarOrden('amount')">
+          Monto {{ sortBy === 'amount' ? (sortDir === 'asc' ? '▲' : '▼') : '↕' }}
+        </th>
+        <th class="col-ordenable" (click)="cambiarOrden('date')">
+          Vencimiento (UTC) {{ sortBy === 'date' ? (sortDir === 'asc' ? '▲' : '▼') : '↕' }}
+        </th>
+        <th>Estado</th>
+        <th>Motivo</th>
+        <th class="derecha">Intentos</th>
+        <th></th>
       </tr>
-    } @empty {
-      <tr>
-        <td colspan="8">No hay cobros fallidos con esos filtros.</td>
-      </tr>
-    }
-  </tbody>
-</table>
+    </thead>
+    <tbody>
+      @for (cobro of cobros(); track cobro.id) {
+        <tr>
+          <td>
+            <a [routerLink]="['/charges', cobro.id]">{{ cobro.customerName }}</a>
+            <div class="secundario">{{ cobro.customerEmail }}</div>
+          </td>
+          <td>{{ cobro.externalReference }}</td>
+          <td class="derecha">{{ cobro.amount | number: '1.0-2' }} {{ cobro.currency }}</td>
+          <td>{{ cobro.dueDate | date: 'yyyy-MM-dd HH:mm' }}</td>
+          <td>{{ etiquetasEstado[cobro.status] || cobro.status }}</td>
+          <td>{{ cobro.failureReason ? (etiquetasMotivo[cobro.failureReason] || cobro.failureReason) : '-' }}</td>
+          <td class="derecha">{{ cobro.attemptCount }} / 3</td>
+          <td>
+            @if (cobro.status === 'paid') {
+              <span>Pagado</span>
+            } @else if (!puedeReintentar(cobro)) {
+              <button type="button" disabled title="No elegible: Límite de 3 intentos alcanzado o tarjeta vencida">
+                No elegible
+              </button>
+            } @else {
+              <button
+                type="button"
+                [disabled]="reintentandoId() !== null"
+                (click)="reintentar(cobro)"
+              >
+                {{ reintentandoId() === cobro.id ? 'Reintentando...' : 'Reintentar' }}
+              </button>
+            }
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
 
-<div class="paginacion">
-  <button type="button" (click)="irA(pagina - 1)">Anterior</button>
-  <span>Página {{ pagina }} de {{ totalPaginas }}</span>
-  <button type="button" (click)="irA(pagina + 1)">Siguiente</button>
-</div>
+  <!-- Paginación en servidor (RF-1) -->
+  <div class="paginacion">
+    <button type="button" [disabled]="pagina <= 1" (click)="irA(pagina - 1)">Anterior</button>
+    <span>Página {{ pagina }} de {{ totalPaginas() }} ({{ totalRegistros() }} cobros)</span>
+    <button type="button" [disabled]="pagina >= totalPaginas()" (click)="irA(pagina + 1)">Siguiente</button>
+  </div>
+}

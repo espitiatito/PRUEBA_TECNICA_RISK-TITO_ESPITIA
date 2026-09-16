@@ -1,4 +1,4 @@
-/* estilos globales, lo minimo para que se lea */
+﻿/* estilos globales, lo minimo para que se lea */
 body {
   margin: 0;
   font-family: system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
@@ -77,6 +77,10 @@ button {
   cursor: pointer;
   background: #f4f4f4;
 }
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 .paginacion {
   display: flex;
   align-items: center;
@@ -99,4 +103,44 @@ dl.datos dt {
 }
 dl.datos dd {
   margin: 0;
+}
+
+/* Diferenciación visual de alertas (RF-4) */
+.alerta {
+  padding: 8px 12px;
+  margin: 10px 0;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.alerta-exito {
+  background: #e8f5e9;
+  border: 1px solid #a5d6a7;
+  color: #1b5e20;
+}
+.alerta-regla {
+  background: #fff8e1;
+  border: 1px solid #ffe082;
+  color: #b78103;
+}
+.alerta-error {
+  background: #ffebee;
+  border: 1px solid #ef9a9a;
+  color: #c62828;
+}
+
+/* Ordenamiento en tabla (RF-1) */
+.col-ordenable {
+  cursor: pointer;
+  user-select: none;
+}
+.col-ordenable:hover {
+  background: #e4e4e4;
+}
+
+/* Estados explícitos de vista (cargando, vacío, error) */
+.estado-cargando,
+.estado-vacio,
+.estado-error {
+  padding: 24px 0;
+  color: #666;
 }

@@ -1,31 +1,57 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { catchError, of } from 'rxjs';
+import { Subject, Subscription, debounceTime, distinctUntilChanged } from 'rxjs';
 
-import { ESTADOS, ETIQUETAS_ESTADO, ETIQUETAS_MOTIVO, MOTIVOS } from '../../models/charge';
+import {
+  Charge,
+  ChargeFilters,
+  ESTADOS,
+  ETIQUETAS_ESTADO,
+  ETIQUETAS_MOTIVO,
+  MOTIVOS,
+} from '../../models/charge';
+import { AppError } from '../../interceptors/error.interceptor';
+import { ChargesService } from '../../services/charges.service';
+
+export type ViewState = 'cargando' | 'vacio' | 'error' | 'datos';
 
 @Component({
   selector: 'app-charges-list',
+  standalone: true,
   imports: [FormsModule, RouterLink, DatePipe, DecimalPipe],
   templateUrl: './charges-list.html',
 })
-export class ChargesList implements OnInit {
-  private readonly http = inject(HttpClient);
+export class ChargesList implements OnInit, OnDestroy {
+  private readonly chargesService = inject(ChargesService);
+  private readonly searchSubject = new Subject<string>();
+  private searchSub?: Subscription;
 
-  cobros = signal<any[]>([]);
-  mensaje = signal('');
+  // Estados de vista explícitos (RF-1 / Frontend guidelines)
+  readonly estadoVista = signal<ViewState>('cargando');
+  readonly cobros = signal<Charge[]>([]);
+  readonly totalRegistros = signal<number>(0);
+  readonly totalPaginas = signal<number>(1);
+  readonly reintentandoId = signal<string | null>(null);
 
+  // Mensajes de retroalimentación diferenciados
+  readonly mensajeExito = signal<string>('');
+  readonly mensajeReglaNegocio = signal<string>('');
+  readonly mensajeErrorSistema = signal<string>('');
+
+  // Filtros reactivos
   estado = 'failed';
   motivo = '';
   desde = '';
   hasta = '';
   texto = '';
 
+  // Paginación y ordenamiento en servidor (RF-1)
   pagina = 1;
   tamanoPagina = 10;
+  sortBy = 'date';
+  sortDir: 'asc' | 'desc' = 'desc';
 
   readonly estados = ESTADOS;
   readonly motivos = MOTIVOS;
@@ -33,82 +59,142 @@ export class ChargesList implements OnInit {
   readonly etiquetasMotivo = ETIQUETAS_MOTIVO;
 
   ngOnInit(): void {
-    let url = 'http://localhost:5080/api/charges?page=1&pageSize=500';
-
-    if (this.estado) {
-      url += '&status=' + this.estado;
-    }
-    if (this.motivo) {
-      url += '&failureReason=' + this.motivo;
-    }
-    if (this.desde) {
-      url += '&from=' + new Date(this.desde + 'T00:00:00').toISOString();
-    }
-    if (this.hasta) {
-      url += '&to=' + new Date(this.hasta + 'T23:59:59').toISOString();
-    }
-
-    this.http
-      .get<any>(url)
-      .pipe(catchError(() => of({ items: [] })))
-      .subscribe((data: any) => {
-        const items = Array.isArray(data) ? data : (data?.items ?? []);
-        this.cobros.set(items);
+    this.searchSub = this.searchSubject
+      .pipe(
+        debounceTime(350),
+        distinctUntilChanged()
+      )
+      .subscribe(() => {
+        this.pagina = 1;
+        this.cargarCobros();
       });
+
+    this.cargarCobros();
   }
 
-  // TODO: paginar esto bien, por ahora se corta en el cliente
-  get filas(): any[] {
-    const inicio = (this.pagina - 1) * this.tamanoPagina;
-    return this.filtrados().slice(inicio, inicio + this.tamanoPagina);
+  ngOnDestroy(): void {
+    this.searchSub?.unsubscribe();
   }
 
-  get totalPaginas(): number {
-    return Math.max(1, Math.ceil(this.filtrados().length / this.tamanoPagina));
+  onSearchChange(): void {
+    this.searchSubject.next(this.texto);
   }
 
   filtrar(): void {
     this.pagina = 1;
-    this.ngOnInit();
+    this.cargarCobros();
   }
 
-  irA(pagina: number): void {
-    if (pagina < 1 || pagina > this.totalPaginas) {
+  cambiarOrden(campo: string): void {
+    if (this.sortBy === campo) {
+      this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.sortBy = campo;
+      this.sortDir = 'desc';
+    }
+    this.pagina = 1;
+    this.cargarCobros();
+  }
+
+  irA(nuevaPagina: number): void {
+    if (nuevaPagina < 1 || nuevaPagina > this.totalPaginas() || nuevaPagina === this.pagina) {
       return;
     }
-    this.pagina = pagina;
+    this.pagina = nuevaPagina;
+    this.cargarCobros();
   }
 
-  reintentar(cobro: any): void {
-    this.mensaje.set('');
-    this.cobros.update((lista: any[]) =>
-      lista.map((c: any) => (c.id === cobro.id ? { ...c, status: 'paid' } : c)),
-    );
+  cargarCobros(): void {
+    this.estadoVista.set('cargando');
+    this.limpiarMensajes();
 
-    this.http
-      .post<any>('http://localhost:5080/api/charges/' + cobro.id + '/retry', { amount: cobro.amount })
-      .subscribe((respuesta: any) => {
-        this.mensaje.set(respuesta.message);
-        if (respuesta.success) {
-          this.ngOnInit();
+    const filters: ChargeFilters = {
+      status: this.estado || undefined,
+      failureReason: this.motivo || undefined,
+      search: this.texto.trim() || undefined,
+      page: this.pagina,
+      pageSize: this.tamanoPagina,
+      sortBy: this.sortBy,
+      sortDir: this.sortDir,
+    };
+
+    // Manejo de criterio de zona horaria UTC limpio
+    if (this.desde) {
+      filters.from = `${this.desde}T00:00:00Z`;
+    }
+    if (this.hasta) {
+      filters.to = `${this.hasta}T23:59:59Z`;
+    }
+
+    this.chargesService.list(filters).subscribe({
+      next: (resultado) => {
+        this.cobros.set(resultado.items);
+        this.totalRegistros.set(resultado.totalCount);
+        this.totalPaginas.set(resultado.totalPages);
+
+        if (resultado.items.length === 0) {
+          this.estadoVista.set('vacio');
+        } else {
+          this.estadoVista.set('datos');
         }
-      });
+      },
+      error: (err: AppError) => {
+        this.mensajeErrorSistema.set(
+          err.message || 'Error al comunicarse con el servicio de cobros.'
+        );
+        this.estadoVista.set('error');
+      },
+    });
   }
 
-  private filtrados(): any[] {
-    const lista = this.cobros();
-    if (!Array.isArray(lista)) {
-      return [];
-    }
-    if (!this.texto) {
-      return lista;
+  reintentar(cobro: Charge): void {
+    if (this.reintentandoId()) {
+      return; // Bloqueo preventivo en frontend
     }
 
-    const buscado = this.texto.toLowerCase();
-    return lista.filter(
-      (c: any) =>
-        c.customerName?.toLowerCase().includes(buscado) ||
-        c.externalReference?.toLowerCase().includes(buscado),
+    this.limpiarMensajes();
+    this.reintentandoId.set(cobro.id);
+
+    this.chargesService.retry(cobro.id, cobro.amount).subscribe({
+      next: (respuesta) => {
+        this.reintentandoId.set(null);
+        this.mensajeExito.set(
+          respuesta.message || 'Cobro procesado correctamente.'
+        );
+        this.cargarCobros();
+      },
+      error: (err: AppError) => {
+        this.reintentandoId.set(null);
+
+        // Diferenciación visual exigida en RF-4:
+        // "No puedes reintentar esto y este es el motivo" vs "Algo se rompió"
+        if (err.isBusinessRule) {
+          this.mensajeReglaNegocio.set(
+            `No es posible reintentar este cobro: ${err.message}`
+          );
+        } else {
+          this.mensajeErrorSistema.set(
+            `Fallo técnico en la operación: ${err.message}`
+          );
+        }
+        this.cargarCobros();
+      },
+    });
+  }
+
+  puedeReintentar(cobro: Charge): boolean {
+    return (
+      cobro.status !== 'paid' &&
+      cobro.status !== 'canceled' &&
+      cobro.status !== 'processing' &&
+      cobro.attemptCount < 3 &&
+      cobro.failureReason !== 'tarjeta_vencida'
     );
+  }
+
+  private limpiarMensajes(): void {
+    this.mensajeExito.set('');
+    this.mensajeReglaNegocio.set('');
+    this.mensajeErrorSistema.set('');
   }
 }
