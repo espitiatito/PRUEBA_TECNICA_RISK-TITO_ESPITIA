@@ -136,13 +136,34 @@ app.MapGet("/api/charges/{id:guid}", async (
 
 app.MapPost("/api/charges/{id:guid}/retry", async (
     Guid id,
-    RetryChargeRequest request,
+    RetryChargeRequest? request,
     ChargeRetryService service,
     CancellationToken cancellationToken) =>
 {
+    if (request is null || request.Amount <= 0)
+    {
+        return Results.BadRequest(new ProblemDetails
+        {
+            Status = StatusCodes.Status400BadRequest,
+            Title = "Petición inválida",
+            Detail = "El monto del reintento debe ser mayor a cero.",
+            Extensions = { ["errorCode"] = BusinessErrorCodes.InvalidAmount }
+        });
+    }
+
     var response = await service.RetryAsync(id, request, cancellationToken);
     if (!response.Success)
     {
+        if (response.ErrorCode == BusinessErrorCodes.InvalidAmount)
+        {
+            return Results.BadRequest(new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Monto inválido",
+                Detail = response.Message,
+                Extensions = { ["errorCode"] = response.ErrorCode }
+            });
+        }
         if (response.ErrorCode == BusinessErrorCodes.ChargeNotFound)
         {
             return Results.NotFound(new ProblemDetails

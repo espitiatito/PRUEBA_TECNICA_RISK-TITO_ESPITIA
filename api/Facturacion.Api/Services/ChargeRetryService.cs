@@ -22,8 +22,13 @@ public class ChargeRetryService
         _logger = logger;
     }
 
-    public async Task<ApiResponse> RetryAsync(Guid chargeId, RetryChargeRequest request, CancellationToken cancellationToken = default)
+    public async Task<ApiResponse> RetryAsync(Guid chargeId, RetryChargeRequest? request, CancellationToken cancellationToken = default)
     {
+        if (request is null || request.Amount <= 0)
+        {
+            return ApiResponse.Fail("El monto del reintento debe ser mayor a cero.", BusinessErrorCodes.InvalidAmount);
+        }
+
         var lockSemaphore = ConcurrencyLocks.GetOrAdd(chargeId, _ => new SemaphoreSlim(1, 1));
 
         // Intento de adquisición no bloqueante para reintentos concurrentes en el mismo milisegundo
